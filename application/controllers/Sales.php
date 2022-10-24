@@ -624,6 +624,102 @@ class Sales extends Secure_Controller
 
 		$data['print_price_info'] = TRUE;
 
+		# inicio integracion
+		ini_set('display_errors', 1);
+
+		$detalle = [];
+		foreach ($data['cart'] as $item) {
+			if($item['taxed_flag']=='Ventas gravadas'){
+				$producto = [
+					'NmbItem' => $item['name'],
+					'QtyItem' => $item['quantity'],
+					'PrcItem' => round($item['price']),
+				
+				];
+			}else{
+				$producto = [
+					'IndExe' => 1,
+					'NmbItem' => $item['name'],
+					'QtyItem' => $item['quantity'],
+					'PrcItem' => round($item['price']),
+	
+				];
+			}
+			
+			
+			array_push($detalle, $producto);
+		}
+
+
+
+		// aqui se deberia integrar la boleta electronica de $data
+
+
+		$url = $data['dte']['url_dte'];
+		$hash = '';
+		if (empty($data['customer_info'])) {
+			$nombre = "Persona sin Rut";
+		} else {
+			$nombre = $data['customer_info'];
+		}
+		$dte = [
+			'Encabezado' => [
+				'IdDoc' => [
+					'TipoDTE' => $this->config->item('tipob'),
+				],
+				'Emisor' => [
+					'RUTEmisor' => $this->config->item('rutdte'),
+				],
+				'Receptor' => [
+					'RUTRecep' => '66666666-6',
+					'RznSocRecep' => $nombre,
+					'GiroRecep' => 'Particular',
+					'DirRecep' => 'Santiago',
+					'CmnaRecep' => 'Santiago',
+				],
+			],
+			'Detalle' => $detalle,
+		];
+
+
+
+		// incluir autocarga de composer
+		require('../vendor/autoload.php');
+		$str = $data['dte']['hash'] . ':x';
+		//var_dump($data['dte']['hash']);die();
+		// echo base64_decode($str);
+
+		// crear cliente
+		$LibreDTE = new \sasco\LibreDTE\SDK\LibreDTE($str, $url);
+		// $LibreDTE->setSSL(false, false); ///< segundo parámetro =false desactiva verificación de SSL
+
+		// crear DTE temporal
+		$emitir = $LibreDTE->post('/dte/documentos/emitir', $dte);
+		if ($emitir['status']['code'] != 200) {
+			die('Error al emitir DTE temporal: ' . $emitir['body'] . "\n");
+		}
+
+		// crear DTE real
+		$generar = $LibreDTE->post('/dte/documentos/generar', $emitir['body']);
+		if ($generar['status']['code'] != 200) {
+			die('Error al generar DTE real: ' . $generar['body'] . "\n");
+		}
+
+		// obtener el PDF del DTE
+		$generar_pdf = $LibreDTE->get('/dte/dte_emitidos/pdf/' . $generar['body']['dte'] . '/' . $generar['body']['folio'] . '/' . $generar['body']['emisor']);
+		if ($generar_pdf['status']['code'] != 200) {
+			die('Error al generar PDF del DTE: ' . $generar_pdf['body'] . "\n");
+		}
+		// $dompdf = new Dompdf\Dompdf(array("isRemoteEnabled" => TRUE, "isPhpEnabled" => TRUE));
+		// $dompdf->loadHtml(str_replace(array("\n", "\r"), '', $generar_pdf['body']));
+		// $dompdf->render();
+		//var_dump($generar_pdf);die();
+		// guardar PDF en el disco
+		//$elarchivo = str_replace('.php', '.pdf', $generar['body']['folio']);
+		//file_put_contents('uploads/' . $elarchivo, $generar_pdf['body']);
+
+		// Fin de la integracion
+
 		if($this->sale_lib->is_invoice_mode())
 		{
 			$invoice_format = $this->config->item('sales_invoice_format');

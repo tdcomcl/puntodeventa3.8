@@ -1,49 +1,229 @@
-<?php $this->load->view("partial/header"); ?>
 
-<?php
-if (isset($error_message))
-{
-	echo "<div class='alert alert-dismissible alert-danger'>".$error_message."</div>";
-	exit;
-}
-?>
-
-<?php if(!empty($customer_email)): ?>
-	<script type="text/javascript">
-	$(document).ready(function()
-	{
-		var send_email = function()
+<div id="receipt_wrapper" style="font-size:<?php echo $this->config->item('receipt_font_size');?>px">
+	<div id="receipt_header">
+		<?php
+		if($this->config->item('company_logo') != '')
 		{
-			$.get('<?php echo site_url() . "/sales/send_receipt/" . $sale_id_num; ?>',
-				function(response)
+		?>
+			<div id="company_name">
+				<img id="image" src="<?php echo base_url('uploads/' . $this->config->item('company_logo')); ?>" alt="company_logo" />
+			</div>
+		<?php
+		}
+		?>
+
+		<?php
+		if($this->config->item('receipt_show_company_name'))
+		{
+		?>
+			<div id="company_name"><?php echo $informacion["body"]["datos_dte"]["Encabezado"]["Emisor"]["RznSocEmisor"]; ?></div>
+		<?php
+		}
+		?>
+		<div id="sale_time"><?php  echo $informacion["body"]["datos_dte"]["Encabezado"]["Emisor"]["GiroEmisor"];?></div>
+		<div id="company_address"><?php echo $informacion["body"]["datos_dte"]["Encabezado"]["Emisor"]["DirOrigen"].','.$informacion["body"]["datos_dte"]["Encabezado"]["Emisor"]["CmnaOrigen"]; ?></div>
+		<div id="company_phone"><?php echo $this->config->item('phone'); ?></div>
+		<div id="sale_receipt"><?php echo $this->lang->line('sales_receipt'); ?></div>
+		<div id="sale_time"><?php echo $transaction_time ?></div>
+	</div>
+
+	<div id="receipt_general_info">
+		<?php
+		if(isset($customer))
+		{
+		?>
+			<div id="customer"><?php echo $this->lang->line('customers_customer').": ".$customer; ?></div>
+		<?php
+		}
+		?>
+
+		<div id="sale_id">Nº: <?php echo $informacion["body"]["datos_dte"]["Encabezado"]["IdDoc"]["Folio"]; ?> </div>
+
+		<?php
+		if(!empty($invoice_number))
+		{
+		?>
+			<div id="invoice_number"><?php echo $this->lang->line('sales_invoice_number').": ".$invoice_number; ?></div>
+		<?php
+		}
+		?>
+
+		<div id="employee"><?php echo $this->lang->line('employees_employee').": ".$employee; ?></div>
+	</div>
+
+	<table id="receipt_items">
+		<tr>
+			<th style="width:40%;"><?php echo $this->lang->line('sales_description_abbrv'); ?></th>
+			<th style="width:20%;"><?php echo $this->lang->line('sales_price'); ?></th>
+			<th style="width:20%;"><?php echo $this->lang->line('sales_quantity'); ?></th>
+			<th style="width:20%;" class="total-value"><?php echo $this->lang->line('sales_total'); ?></th>
+			
+		</tr>
+		<?php
+		foreach($cart as $line=>$item)
+		{
+			if($item['print_option'] == PRINT_YES)
+			{
+			?>
+				<tr>
+					<td><?php echo ucfirst($item['name'] . ' ' . $item['attribute_values']); ?></td>
+					<td><?php echo to_currency($item['price']); ?></td>
+					<td><?php echo to_quantity_decimals($item['quantity']); ?></td>
+					<td class="total-value"><?php echo to_currency($item[($this->config->item('receipt_show_total_discount') ? 'total' : 'discounted_total')]); ?></td>
+					<?php
+					if($this->config->item('receipt_show_tax_ind'))
+					{
+					?>
+						<td><?php echo $item['taxed_flag'] ?></td>
+					<?php
+					}
+					?>
+				</tr>
+				<tr>
+					<?php
+					if($this->config->item('receipt_show_description'))
+					{
+					?>
+						<td colspan="2"><?php echo $item['description']; ?></td>
+					<?php
+					}
+
+					if($this->config->item('receipt_show_serialnumber'))
+					{
+					?>
+						<td><?php echo $item['serialnumber']; ?></td>
+					<?php
+					}
+					?>
+				</tr>
+				<?php
+				if($item['discount'] > 0)
 				{
-					$.notify( { message: response.message }, { type: response.success ? 'success' : 'danger'} )
-				}, 'json'
-			);
-		};
+				?>
+					<tr>
+						<?php
+						if($item['discount_type'] == FIXED)
+						{
+						?>
+							<td colspan="3" class="discount"><?php echo to_currency($item['discount']) . " " . $this->lang->line("sales_discount") ?></td>
+						<?php
+						}
+						elseif($item['discount_type'] == PERCENT)
+						{
+						?>
+							<td colspan="3" class="discount"><?php echo number_format($item['discount'], 0) . " " . $this->lang->line("sales_discount_included") ?></td>
+						<?php
+						}	
+						?>
+						<td class="total-value"><?php echo to_currency($item['discounted_total']); ?></td>
+					</tr>
+				<?php
+				}
+			}
+		}
+		?>
 
-		$("#show_email_button").click(send_email);
+		<?php
+		if($this->config->item('receipt_show_total_discount') && $discount > 0)
+		{
+		?>
+			<tr>
+				<td colspan="3" style='text-align:right;border-top:2px solid #000000;'><?php echo $this->lang->line('sales_sub_total'); ?></td>
+				<td style='text-align:right;border-top:2px solid #000000;'><?php echo to_currency($prediscount_subtotal); ?></td>
+			</tr>
+			<tr>
+				<td colspan="3" class="total-value"><?php echo $this->lang->line('sales_customer_discount'); ?>:</td>
+				<td class="total-value"><?php echo to_currency($discount * -1); ?></td>
+			</tr>
+		<?php
+		}
+		?>
 
-		<?php if(!empty($email_receipt)): ?>
-			send_email();
-		<?php endif; ?>
-	});
-	</script>
-<?php endif; ?>
+		<?php
+		if($this->config->item('receipt_show_taxes'))
+		{
+		?>
+			<tr>
+				<td colspan="3" style='text-align:right;border-top:2px solid #000000;'><?php echo $this->lang->line('sales_sub_total'); ?></td>
+				<td style='text-align:right;border-top:2px solid #000000;'><?php echo to_currency($subtotal); ?></td>
+			</tr>
+			<?php
+			foreach($taxes as $tax_group_index=>$tax)
+			{
+			?>
 
-<?php $this->load->view('partial/print_receipt', array('print_after_sale'=>$print_after_sale, 'selected_printer'=>'receipt_printer')); ?>
+				<tr>
+					<td colspan="3" class="total-value"><?php echo (float)$tax['tax_rate'] . '% ' . $tax['tax_group']; ?>:</td>
+					<td class="total-value"><?php echo to_currency_tax($tax['sale_tax_amount']); ?></td>
+				</tr>
+				<tr>
+					<td colspan="3" class="total-value">Total Excento:</td>
+					<td class="total-value"><?php echo $informacion["body"]["datos_dte"]["Encabezado"]["Totales"]["MntExe"]; ?></td>
+				</tr>
+			<?php
+			}
+			?>
+		<?php
+		}
+		?>
 
-<div class="print_hide" id="control_buttons" style="text-align:right">
-	<a href="javascript:printdoc();"><div class="btn btn-info btn-sm", id="show_print_button"><?php echo '<span class="glyphicon glyphicon-print">&nbsp</span>' . $this->lang->line('common_print'); ?></div></a>
-	<?php if(!empty($customer_email)): ?>
-		<a href="javascript:void(0);"><div class="btn btn-info btn-sm", id="show_email_button"><?php echo '<span class="glyphicon glyphicon-envelope">&nbsp</span>' . $this->lang->line('sales_send_receipt'); ?></div></a>
-	<?php endif; ?>
-	<?php echo anchor("sales", '<span class="glyphicon glyphicon-shopping-cart">&nbsp</span>' . $this->lang->line('sales_register'), array('class'=>'btn btn-info btn-sm', 'id'=>'show_sales_button')); ?>
-	<?php if($this->Employee->has_grant('reports_sales', $this->session->userdata('person_id'))): ?>
-		<?php echo anchor("sales/manage", '<span class="glyphicon glyphicon-list-alt">&nbsp</span>' . $this->lang->line('sales_takings'), array('class'=>'btn btn-info btn-sm', 'id'=>'show_takings_button')); ?>
-	<?php endif; ?>
+		<tr>
+		</tr>
+
+		<?php $border = (!$this->config->item('receipt_show_taxes') && !($this->config->item('receipt_show_total_discount') && $discount > 0)); ?>
+		<tr>
+			<td colspan="3" style="text-align:right;<?php echo $border? 'border-top: 2px solid black;' :''; ?>"><?php echo $this->lang->line('sales_total'); ?></td>
+			<td style="text-align:right;<?php echo $border? 'border-top: 2px solid black;' :''; ?>"><?php echo to_currency($total); ?></td>
+		</tr>
+
+		<tr>
+			<td colspan="4">&nbsp;</td>
+		</tr>
+
+		<?php
+		$only_sale_check = FALSE;
+		$show_giftcard_remainder = FALSE;
+		foreach($payments as $payment_id=>$payment)
+		{
+			$only_sale_check |= $payment['payment_type'] == $this->lang->line('sales_check');
+			$splitpayment = explode(':', $payment['payment_type']);
+			$show_giftcard_remainder |= $splitpayment[0] == $this->lang->line('sales_giftcard');
+		?>
+			<tr>
+				<td colspan="3" style="text-align:right;"><?php echo $splitpayment[0]; ?> </td>
+				<td class="total-value"><?php echo to_currency( $payment['payment_amount'] * -1 ); ?></td>
+			</tr>
+		<?php
+		}
+		?>
+
+		<tr>
+			<td colspan="4">&nbsp;</td>
+		</tr>
+
+		<?php
+		if(isset($cur_giftcard_value) && $show_giftcard_remainder)
+		{
+		?>
+			<tr>
+				<td colspan="3" style="text-align:right;"><?php echo $this->lang->line('sales_giftcard_balance'); ?></td>
+				<td class="total-value"><?php echo to_currency($cur_giftcard_value); ?></td>
+			</tr>
+		<?php
+		}
+		?>
+		<tr>
+			<td colspan="3" style="text-align:right;"> <?php echo $this->lang->line($amount_change >= 0 ? ($only_sale_check ? 'sales_check_balance' : 'sales_change_due') : 'sales_amount_due') ; ?> </td>
+			<td class="total-value"><?php echo to_currency($amount_change); ?></td>
+		</tr>
+	</table>
+
+	
+
+	<div id="barcode">
+		<img src='https://demopos.sisnet.cl/<?php  echo $informacion["body"]["datos_dte"]["Encabezado"]["IdDoc"]["Folio"]; ?>.png' /><br>
+		<p>Timbre Electronico SII</p>
+		<p>Resolución <?php echo $informacion["body"]["resolucion"]["numero"]; ?> de <?php echo $informacion["body"]["resolucion"]["fecha"]; ?></p>
+		<?php  ?>
+	</div>
 </div>
-
-<?php $this->load->view("sales/" . $this->config->item('receipt_template')); ?>
-
-<?php $this->load->view("partial/footer"); ?>

@@ -255,6 +255,12 @@ class Config extends Secure_Controller
 			'phone' => $this->input->post('phone'),
 			'email' => $this->input->post('email'),
 			'fax' => $this->input->post('fax'),
+			# agregando campos CRT
+			'hash' => $this->input->post('hash'),
+			'url_dte' => $this->input->post('url_dte'),
+			'tipo' => $this->input->post('tipo'),
+			'tipob' => $this->input->post('tipob'),
+			'rutdte' => $this->input->post('rutdte'),
 			'website' => $this->input->post('website'),
 			'return_policy' => $this->input->post('return_policy')
 		);
